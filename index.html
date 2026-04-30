@@ -71,24 +71,39 @@ progress::-webkit-progress-value{background:#FF6B4A;border-radius:3px;transition
     padding:10px 24px;font-size:14px;font-weight:900;cursor:pointer">重新整理</button>
 </div>
 <div id="root"></div>
-<script type="text/babel">
-// 全域錯誤捕捉 - 任何 JS 錯誤都會顯示在畫面上
+<!-- 純 JS 錯誤捕捉（在 Babel 之前執行）-->
+<script>
+window.__INK_MC_LOADED__ = false;
 window.addEventListener('error', function(e){
-  console.error('[GLOBAL ERROR]',e.message,e.filename,e.lineno);
+  console.error('[GLOBAL ERROR]',e.message,e.filename,e.lineno,e.error);
   var d=document.createElement('div');
-  d.style.cssText='position:fixed;top:10px;left:10px;right:10px;background:#FF6B4A;color:#000;padding:12px;font:12px monospace;z-index:99999;border-radius:8px;white-space:pre-wrap;word-break:break-all';
-  d.textContent='JS Error: '+e.message+'\n'+e.filename+':'+e.lineno;
+  d.style.cssText='position:fixed;top:10px;left:10px;right:10px;background:#FF6B4A;color:#000;padding:12px;font:12px/1.5 monospace;z-index:99999;border-radius:8px;white-space:pre-wrap;word-break:break-all;max-height:60vh;overflow:auto';
+  d.textContent='⚠️ JS Error\n\n'+e.message+'\n\nFile: '+(e.filename||'inline')+'\nLine: '+e.lineno+'\n\n'+(e.error&&e.error.stack?e.error.stack:'');
   document.body.appendChild(d);
 });
 window.addEventListener('unhandledrejection', function(e){
   console.error('[UNHANDLED PROMISE]',e.reason);
   var d=document.createElement('div');
-  d.style.cssText='position:fixed;top:10px;left:10px;right:10px;background:#FFB347;color:#000;padding:12px;font:12px monospace;z-index:99999;border-radius:8px;white-space:pre-wrap;word-break:break-all';
-  d.textContent='Promise Error: '+(e.reason&&e.reason.message?e.reason.message:e.reason);
+  d.style.cssText='position:fixed;top:10px;left:10px;right:10px;background:#FFB347;color:#000;padding:12px;font:12px/1.5 monospace;z-index:99999;border-radius:8px;white-space:pre-wrap;word-break:break-all;max-height:60vh;overflow:auto';
+  var r=e.reason;
+  d.textContent='⚠️ Promise Error\n\n'+(r&&r.message?r.message:String(r))+'\n\n'+(r&&r.stack?r.stack:'');
   document.body.appendChild(d);
 });
-console.log('[INK MC] Script start, React=',typeof React,'supabase=',typeof supabase);
+console.log('[INK MC] Pre-Babel: React=',typeof React,', supabase=',typeof supabase,', Babel=',typeof Babel);
 
+// 5 秒後檢查 Babel 是否成功跑完
+setTimeout(function(){
+  if(!window.__INK_MC_LOADED__){
+    var d=document.createElement('div');
+    d.style.cssText='position:fixed;top:10px;left:10px;right:10px;background:#FF6B4A;color:#000;padding:14px;font:13px/1.5 monospace;z-index:99999;border-radius:8px;white-space:pre-wrap';
+    d.textContent='❌ Babel 編譯沒完成（5 秒後 App 還沒啟動）\n\n可能原因：\n• Babel CDN 載入失敗\n• 程式碼有語法錯誤\n\nReact: '+typeof React+'\nsupabase: '+typeof supabase+'\nBabel: '+typeof Babel;
+    document.body.appendChild(d);
+  }
+},5000);
+</script>
+<script type="text/babel" data-presets="env,react">
+console.log('[INK MC] Babel script started');
+window.__INK_MC_LOADED__ = true;
 const {useState,useRef,useCallback,useEffect,useMemo}=React;
 
 // ── Supabase 設定 ───────────────────────────────────────────
@@ -2408,7 +2423,7 @@ const BackendHome=({cases,onNav})=>{
 };
 
 // ─── App Root ──────────────────────────────────────────────
-console.log("[INK MC] App build v8 - "+new Date().toISOString());
+console.log("[INK MC] App build v9 - "+new Date().toISOString());
 const App=()=>{
   // 同步檢查 localStorage 是否有 supabase token，沒有直接顯示登入頁（不等 API）
   const [view,setView]=useState(()=>{
