@@ -2401,44 +2401,52 @@ const App=()=>{
       name:a.bank_holder||"",deposit:(a.deposit_amount||2000).toLocaleString(),tel:a.phone||""});
   },[]);
 
-  // Auth init: getSession 決定初始狀態，onAuthStateChange 只處理後續登入/登出
+  // Auth init: 用 getUser() 真實驗證 session（避免殘留失效 session 直接進 app）
   useEffect(()=>{
     let cancelled=false;
     let initialized=false;
 
-    const loadUser=async(session)=>{
+    const goLogin=async()=>{
       if(cancelled)return;
-      if(session?.user){
-        try{
-          setUserId(session.user.id);
-          const {data:a}=await supa.from("artists").select("*").eq("id",session.user.id).single();
-          if(cancelled)return;
-          applyArtistData(a);
-          await loadCases(session.user.id);
-          if(cancelled)return;
-          setView("app");
-        }catch(e){
-          console.error("loadUser error:",e);
-          if(!cancelled){setView("login");setUserId(null);setCases([]);}
-        }
-      } else {
-        if(!cancelled){setView("login");setUserId(null);setCases([]);}
+      // 清掉本地殘留的失效 session
+      try{ await supa.auth.signOut(); }catch(e){}
+      if(!cancelled){setView("login");setUserId(null);setCases([]);}
+    };
+
+    const loadUser=async(userObj)=>{
+      if(cancelled)return;
+      if(!userObj){ goLogin(); return; }
+      try{
+        setUserId(userObj.id);
+        const {data:a,error:aErr}=await supa.from("artists").select("*").eq("id",userObj.id).single();
+        if(aErr) throw aErr;
+        if(cancelled)return;
+        applyArtistData(a);
+        await loadCases(userObj.id);
+        if(cancelled)return;
+        setView("app");
+      }catch(e){
+        console.error("loadUser error:",e);
+        // 任何資料抓取失敗 → session 一定有問題，登出回登入頁
+        goLogin();
       }
     };
 
-    // ① 先用 getSession 決定初始狀態（同步、可靠）
-    supa.auth.getSession().then(({data:{session}})=>{
+    // ① 用 getUser() 真實向 Supabase 驗證 session（不只是讀本地 token）
+    supa.auth.getUser().then(({data:{user},error})=>{
       initialized=true;
-      loadUser(session);
+      if(error||!user){ goLogin(); return; }
+      loadUser(user);
     }).catch(()=>{
       initialized=true;
-      if(!cancelled)setView("login");
+      goLogin();
     });
 
     // ② onAuthStateChange 只處理「初始化之後」的登入/登出事件
     const {data:{subscription}}=supa.auth.onAuthStateChange((_event,session)=>{
-      if(!initialized)return; // 初始化前忽略，避免競爭
-      loadUser(session);
+      if(!initialized)return;
+      if(session?.user) loadUser(session.user);
+      else goLogin();
     });
 
     return()=>{ cancelled=true; subscription.unsubscribe(); };
