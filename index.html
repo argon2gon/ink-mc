@@ -2386,7 +2386,13 @@ const App=()=>{
 
   // Fix 1 + 2: 用 onAuthStateChange 監聽，自動恢復 session + 重新從 DB 讀資料
   useEffect(()=>{
+    // 保底：5秒後若還在 checking，直接跳登入頁
+    const fallback=setTimeout(()=>{
+      setView(v=>v==="checking"?"login":v);
+    },5000);
+
     const {data:{subscription}}=supa.auth.onAuthStateChange(async(event,session)=>{
+      clearTimeout(fallback);
       if(session?.user){
         setUserId(session.user.id);
         const {data:a}=await supa.from("artists").select("*").eq("id",session.user.id).single();
@@ -2397,7 +2403,7 @@ const App=()=>{
         setView("login");setUserId(null);setCases([]);
       }
     });
-    return()=>subscription.unsubscribe();
+    return()=>{ clearTimeout(fallback); subscription.unsubscribe(); };
   },[loadCases,applyArtistData]);
 
   const handleLogin=useCallback(()=>{},[]);
