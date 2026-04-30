@@ -689,12 +689,43 @@ const Login=({onLogin})=>{
 
   const handleLogin=async()=>{
     setLoading(true); setErr("");
-    const {data,error}=await supa.auth.signInWithPassword({email:u,password:p});
-    if(error){ setErr(error.message); setLoading(false); return; }
-    // 取刺青師 profile
-    const {data:artist}=await supa.from("artists").select("*").eq("id",data.user.id).single();
-    onLogin(data.user, artist||{});
-    setLoading(false);
+    try{
+      const {data,error}=await supa.auth.signInWithPassword({email:u,password:p});
+      if(error){ setErr(error.message); setLoading(false); return; }
+      console.log("[INK MC] Login OK, user:",data.user.id);
+      // 取刺青師 profile（用 maybeSingle 避免找不到時 hang 住）
+      let artist={};
+      try{
+        const {data:a,error:aErr}=await supa.from("artists")
+          .select("*").eq("id",data.user.id).maybeSingle();
+        if(aErr) console.warn("artist load warning:",aErr.message);
+        artist=a||{};
+      }catch(e){ console.warn("artist fetch failed:",e); }
+      
+      // 如果還沒有 artist profile，建立一個空的
+      if(!artist||!artist.id){
+        console.log("[INK MC] Creating new artist profile...");
+        const {data:newA,error:cErr}=await supa.from("artists").insert({
+          id:data.user.id, name:"", studio:"", ig:"", phone:"", address:"",
+          bank_name:"玉山銀行 (808)", bank_account:"", bank_holder:"",
+          deposit_amount:2000, use_consult:true,
+        }).select().single();
+        if(cErr){
+          console.error("Create artist failed:",cErr);
+          setErr("建立帳號資料失敗："+cErr.message);
+          setLoading(false);
+          return;
+        }
+        artist=newA;
+      }
+      
+      onLogin(data.user, artist);
+      setLoading(false);
+    }catch(e){
+      console.error("[INK MC] Login error:",e);
+      setErr("登入失敗："+(e.message||"未知錯誤"));
+      setLoading(false);
+    }
   };
 
   return(
