@@ -2402,14 +2402,15 @@ const App=()=>{
       name:a.bank_holder||"",deposit:(a.deposit_amount||2000).toLocaleString(),tel:a.phone||""});
   },[]);
 
-  // Auth init: 主動呼叫 getSession() + 監聽後續變化（修正 onAuthStateChange 不觸發問題）
+  // Auth init: getSession 決定初始狀態，onAuthStateChange 只處理後續登入/登出
   useEffect(()=>{
     let cancelled=false;
+    let initialized=false;
 
-    const handleSession=async(session)=>{
+    const loadUser=async(session)=>{
       if(cancelled)return;
-      try{
-        if(session?.user){
+      if(session?.user){
+        try{
           setUserId(session.user.id);
           const {data:a}=await supa.from("artists").select("*").eq("id",session.user.id).single();
           if(cancelled)return;
@@ -2417,23 +2418,28 @@ const App=()=>{
           await loadCases(session.user.id);
           if(cancelled)return;
           setView("app");
-        } else {
-          setView("login");setUserId(null);setCases([]);
+        }catch(e){
+          console.error("loadUser error:",e);
+          if(!cancelled){setView("login");setUserId(null);setCases([]);}
         }
-      }catch(e){
-        console.error("Auth error:",e);
-        if(!cancelled)setView("login");
+      } else {
+        if(!cancelled){setView("login");setUserId(null);setCases([]);}
       }
     };
 
-    // ① 主動取得目前 session（不依賴 onAuthStateChange 是否觸發）
+    // ① 先用 getSession 決定初始狀態（同步、可靠）
     supa.auth.getSession().then(({data:{session}})=>{
-      if(!cancelled) handleSession(session);
-    }).catch(()=>{ if(!cancelled)setView("login"); });
+      initialized=true;
+      loadUser(session);
+    }).catch(()=>{
+      initialized=true;
+      if(!cancelled)setView("login");
+    });
 
-    // ② 監聽後續登入/登出事件
+    // ② onAuthStateChange 只處理「初始化之後」的登入/登出事件
     const {data:{subscription}}=supa.auth.onAuthStateChange((_event,session)=>{
-      handleSession(session);
+      if(!initialized)return; // 初始化前忽略，避免競爭
+      loadUser(session);
     });
 
     return()=>{ cancelled=true; subscription.unsubscribe(); };
