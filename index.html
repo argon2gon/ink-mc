@@ -87,6 +87,12 @@ try {
   throw e;
 }
 
+// ── Promise timeout helper ────────────────────────────────
+const withTimeout=(p,ms,label="op")=>Promise.race([
+  p,
+  new Promise((_,rej)=>setTimeout(()=>rej(new Error(`${label} timeout (${ms}ms)`)),ms))
+]);
+
 // ── API 呼叫 helpers ────────────────────────────────────────
 const apiFetch = async (fn, body) => {
   const { data: { session } } = await supa.auth.getSession();
@@ -2385,7 +2391,7 @@ const BackendHome=({cases,onNav})=>{
 };
 
 // ─── App Root ──────────────────────────────────────────────
-console.log("[INK MC] App build v6 - "+new Date().toISOString());
+console.log("[INK MC] App build v7 - "+new Date().toISOString());
 const App=()=>{
   // 同步檢查 localStorage 是否有 supabase token，沒有直接顯示登入頁（不等 API）
   const [view,setView]=useState(()=>{
@@ -2456,15 +2462,36 @@ const App=()=>{
       if(cancelled||!userObj){ goLogin(); return; }
       try{
         setUserId(userObj.id);
-        const {data:a,error:aErr}=await supa.from("artists").select("*").eq("id",userObj.id).single();
+        console.log("[INK MC] loadUser - fetching artist for",userObj.id);
+        // 用 maybeSingle + 5 秒 timeout 避免 RLS 卡住
+        const {data:a,error:aErr}=await withTimeout(
+          supa.from("artists").select("*").eq("id",userObj.id).maybeSingle(),
+          5000,"artist fetch"
+        );
         if(aErr) throw aErr;
         if(cancelled)return;
-        applyArtistData(a);
-        await loadCases(userObj.id);
+        if(!a){
+          console.warn("[INK MC] No artist profile, creating one...");
+          const {data:newA,error:cErr}=await withTimeout(
+            supa.from("artists").insert({
+              id:userObj.id, name:"", studio:"", ig:"", phone:"", address:"",
+              bank_name:"玉山銀行 (808)", bank_account:"", bank_holder:"",
+              deposit_amount:2000, use_consult:true,
+            }).select().single(),
+            5000,"artist create"
+          );
+          if(cErr) throw cErr;
+          applyArtistData(newA);
+        } else {
+          applyArtistData(a);
+        }
+        if(cancelled)return;
+        try{ await withTimeout(loadCases(userObj.id),8000,"loadCases"); }
+        catch(e){ console.warn("loadCases timeout:",e.message); }
         if(cancelled)return;
         setView("app");
       }catch(e){
-        console.error("loadUser error:",e);
+        console.error("[INK MC] loadUser error:",e.message||e);
         goLogin();
       }
     };
