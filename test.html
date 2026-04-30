@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<title>JS 測試</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+</head>
+<body style="background:#0E0B08;color:#F8EFD8;font-family:sans-serif;padding:20px;">
+<h1 style="color:#FF6B4A;">JavaScript 環境測試</h1>
+<div id="result" style="font-size:16px;padding:20px;background:#1A1410;border-radius:8px;line-height:1.8;">
+  ❌ 如果你看到這行紅字，代表 JS 沒跑
+</div>
+<button id="btn" 
+  style="margin-top:20px;padding:14px 28px;background:#FF6B4A;color:#000;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:bold;">
+  點我測試按鈕
+</button>
+<div id="clickResult" style="margin-top:20px;font-size:16px;color:#7BCB99;"></div>
+
+<script>
+console.log('[TEST] Plain JS executed at', new Date().toISOString());
+
+document.getElementById('result').innerHTML = 
+  '✅ JavaScript 正常執行<br>' +
+  '⏰ 時間：' + new Date().toLocaleString() + '<br>' +
+  '🌐 瀏覽器：' + navigator.userAgent.substring(0, 100) + '<br>' +
+  '📦 React 載入：' + (typeof React !== 'undefined' ? '✅' : '❌ (這頁本來就沒載入 React，正常)');
+
+document.getElementById('btn').addEventListener('click', function(){
+  document.getElementById('clickResult').innerText = 
+    '✅ 按鈕點擊正常！時間：' + new Date().toLocaleTimeString();
+  console.log('[TEST] Button clicked');
+});
+
+window.addEventListener('error', function(e){
+  document.getElementById('result').innerHTML += '<br>❌ JS 錯誤：' + e.message;
+});
+</script>
+</body>
+</html>
