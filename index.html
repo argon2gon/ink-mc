@@ -453,6 +453,8 @@ const CustomerPage=({workflow,bankInfo,onBookingCreated,artistId})=>{
   const [lookupId,setLookupId]=useState("");
   const [txCode,setTxCode]=useState("");
   const [txTime,setTxTime]=useState("");
+  const [lookupErr,setLookupErr]=useState("");
+  const [lookupLoading,setLookupLoading]=useState(false);
 
   const phoneNum=bankInfo?.tel||"0912-345-678";
   const bank=bankInfo&&bankInfo.account
@@ -561,9 +563,6 @@ const CustomerPage=({workflow,bankInfo,onBookingCreated,artistId})=>{
 
   // ── lookup ──
   if(step==="lookup") {
-    const [lookupErr,setLookupErr]=useState("");
-    const [lookupLoading,setLookupLoading]=useState(false);
-
     const doLookup=async()=>{
       if(lookupId.length<7){ setLookupErr("請輸入完整預約單號"); return; }
       setLookupLoading(true); setLookupErr("");
