@@ -9,7 +9,8 @@
 <!-- Bebas Neue 替代 Achieve It（Google Fonts 可靠載入），Noto Sans TC 中文 -->
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+TC:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <!-- Supabase JS SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"
+  onerror="document.getElementById('sdk-err').style.display='flex'"></script>
 <style>
 /* Bebas Neue = INK MC brand font (loaded from Google Fonts, works on all deployments) */
 .achieve{font-family:'Bebas Neue',sans-serif;}
@@ -54,11 +55,21 @@ progress{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-ra
 progress::-webkit-progress-bar{background:#2A2017;border-radius:3px;}
 progress::-webkit-progress-value{background:#FF6B4A;border-radius:3px;transition:width .3s;}
 </style>
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js" crossorigin="anonymous"
+  onerror="document.getElementById('sdk-err').style.display='flex'"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
+<div id="sdk-err" style="display:none;position:fixed;inset:0;background:#0E0B08;z-index:9999;
+  align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:sans-serif">
+  <span style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:#FF6B4A">INK MC</span>
+  <div style="color:#F2E5C4;font-size:14px;text-align:center;max-width:280px;line-height:1.6">
+    ⚠️ 無法載入必要套件<br>請確認網路連線後重新整理
+  </div>
+  <button onclick="location.reload()" style="background:#FF6B4A;color:#000;border:none;border-radius:999px;
+    padding:10px 24px;font-size:14px;font-weight:900;cursor:pointer">重新整理</button>
+</div>
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useRef,useCallback,useEffect,useMemo}=React;
@@ -67,7 +78,14 @@ const {useState,useRef,useCallback,useEffect,useMemo}=React;
 const SUPA_URL  = "https://nyyaneiraagjciqksuom.supabase.co";
 const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55eWFuZWlyYWFnamNpcWtzdW9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NzAzNjQsImV4cCI6MjA5MzA0NjM2NH0.HN5ArAqx1auR2oZ83I0ZOSzYQ0EQZ4s-NrT51p7YLdY";
 const FN_BASE   = `${SUPA_URL}/functions/v1`;
-const supa      = supabase.createClient(SUPA_URL, SUPA_ANON);
+let supa;
+try {
+  supa = supabase.createClient(SUPA_URL, SUPA_ANON);
+} catch(e) {
+  console.error("Supabase init failed:", e);
+  document.getElementById('sdk-err').style.display='flex';
+  throw e;
+}
 
 // ── API 呼叫 helpers ────────────────────────────────────────
 const apiFetch = async (fn, body) => {
@@ -2386,13 +2404,14 @@ const App=()=>{
 
   // Fix 1 + 2: 用 onAuthStateChange 監聽，自動恢復 session + 重新從 DB 讀資料
   useEffect(()=>{
-    // 保底：5秒後若還在 checking，直接跳登入頁
+    // 保底：3秒後若還在 checking，直接跳登入頁
     const fallback=setTimeout(()=>{
       setView(v=>v==="checking"?"login":v);
-    },5000);
+    },3000);
 
     const {data:{subscription}}=supa.auth.onAuthStateChange(async(event,session)=>{
       clearTimeout(fallback);
+      try{
       if(session?.user){
         setUserId(session.user.id);
         const {data:a}=await supa.from("artists").select("*").eq("id",session.user.id).single();
@@ -2402,6 +2421,7 @@ const App=()=>{
       } else {
         setView("login");setUserId(null);setCases([]);
       }
+      }catch(e){console.error("Auth error:",e);setView("login");}
     });
     return()=>{ clearTimeout(fallback); subscription.unsubscribe(); };
   },[loadCases,applyArtistData]);
