@@ -2354,6 +2354,7 @@ const BackendHome=({cases,onNav})=>{
 };
 
 // ─── App Root ──────────────────────────────────────────────
+console.log("[INK MC] App build v6 - "+new Date().toISOString());
 const App=()=>{
   // 同步檢查 localStorage 是否有 supabase token，沒有直接顯示登入頁（不等 API）
   const [view,setView]=useState(()=>{
@@ -2437,9 +2438,18 @@ const App=()=>{
       }
     };
 
-    // 只有 view="checking"（localStorage 有 token）才需要驗證
-    if(view!=="checking"){
+    // 重新檢查 localStorage（在 useEffect 內，避免 closure 問題）
+    let hasToken=false;
+    try{
+      const keys=Object.keys(localStorage);
+      hasToken=keys.some(k=>k.startsWith("sb-")&&k.endsWith("-auth-token"));
+    }catch(e){}
+    
+    console.log("[INK MC] App init, hasToken:",hasToken);
+    
+    if(!hasToken){
       initialized=true;
+      setView("login");
     } else {
       // 4 秒 timeout，避免 getUser 永遠 pending 卡住畫面
       const timeoutId=setTimeout(()=>{
