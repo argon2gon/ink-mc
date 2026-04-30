@@ -2402,28 +2402,41 @@ const App=()=>{
       name:a.bank_holder||"",deposit:(a.deposit_amount||2000).toLocaleString(),tel:a.phone||""});
   },[]);
 
-  // Fix 1 + 2: 用 onAuthStateChange 監聽，自動恢復 session + 重新從 DB 讀資料
+  // Auth init: 主動呼叫 getSession() + 監聽後續變化（修正 onAuthStateChange 不觸發問題）
   useEffect(()=>{
-    // 保底：3秒後若還在 checking，直接跳登入頁
-    const fallback=setTimeout(()=>{
-      setView(v=>v==="checking"?"login":v);
-    },3000);
+    let cancelled=false;
 
-    const {data:{subscription}}=supa.auth.onAuthStateChange(async(event,session)=>{
-      clearTimeout(fallback);
+    const handleSession=async(session)=>{
+      if(cancelled)return;
       try{
-      if(session?.user){
-        setUserId(session.user.id);
-        const {data:a}=await supa.from("artists").select("*").eq("id",session.user.id).single();
-        applyArtistData(a);
-        await loadCases(session.user.id);
-        setView("app");
-      } else {
-        setView("login");setUserId(null);setCases([]);
+        if(session?.user){
+          setUserId(session.user.id);
+          const {data:a}=await supa.from("artists").select("*").eq("id",session.user.id).single();
+          if(cancelled)return;
+          applyArtistData(a);
+          await loadCases(session.user.id);
+          if(cancelled)return;
+          setView("app");
+        } else {
+          setView("login");setUserId(null);setCases([]);
+        }
+      }catch(e){
+        console.error("Auth error:",e);
+        if(!cancelled)setView("login");
       }
-      }catch(e){console.error("Auth error:",e);setView("login");}
+    };
+
+    // ① 主動取得目前 session（不依賴 onAuthStateChange 是否觸發）
+    supa.auth.getSession().then(({data:{session}})=>{
+      if(!cancelled) handleSession(session);
+    }).catch(()=>{ if(!cancelled)setView("login"); });
+
+    // ② 監聽後續登入/登出事件
+    const {data:{subscription}}=supa.auth.onAuthStateChange((_event,session)=>{
+      handleSession(session);
     });
-    return()=>{ clearTimeout(fallback); subscription.unsubscribe(); };
+
+    return()=>{ cancelled=true; subscription.unsubscribe(); };
   },[loadCases,applyArtistData]);
 
   const handleLogin=useCallback(()=>{},[]);
