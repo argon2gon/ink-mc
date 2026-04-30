@@ -2467,6 +2467,8 @@ const App=()=>{
     showToast(`✓ 案件 ${form.name} 已建立`);
     await loadCases(userId);
   },[userId,loadCases]);
+
+  const runOCRReal=useCallback(async(imageFile)=>{
     const base64=await new Promise(resolve=>{
       const r=new FileReader();r.onload=()=>resolve(r.result.split(",")[1]);r.readAsDataURL(imageFile);
     });
